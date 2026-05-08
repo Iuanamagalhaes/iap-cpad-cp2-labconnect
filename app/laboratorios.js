@@ -3,13 +3,14 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Animated } from 'react-native';
+import { Cores } from '../constants/cores';
 
-const labs = [
+const laboratorios = [
   {
     nome: 'Laboratório Maker',
     andar: '6º Andar',
@@ -33,98 +34,112 @@ const labs = [
       TERÇA: [],
       QUARTA: [{ disciplina: 'Data Science and Analytics', professor: 'Prof. Roberto Gutierrez Beraldo', inicio: '08:00', fim: '09:40' }],
       QUINTA: [],
-      SEXTA: [{ disciplina: 'Object-Oriented Programind', professor: 'Prof. Ygor Moraes Martins dos Anjos', inicio: '08:00', fim: '09:40' }],
+      SEXTA: [{ disciplina: 'Object-Oriented Programming', professor: 'Prof. Ygor Moraes Martins dos Anjos', inicio: '08:00', fim: '09:40' }],
     },
-  }
+  },
 ];
 
 export default function Laboratorios() {
-  const router = useRouter();
-  const [selectedLab, setSelectedLab] = useState(labs[0]);
+  const roteador = useRouter();
+  const [labSelecionado, setLabSelecionado] = useState(laboratorios[0]);
 
-  const statusColor = selectedLab.status === 'Disponível' ? '#22c55e' : '#ED145B';
+  const animacaoOpacidade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(animacaoOpacidade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Text style={styles.backText}>Voltar</Text>
+    <Animated.ScrollView
+      style={[estilos.scroll, { opacity: animacaoOpacidade }]}
+      contentContainerStyle={estilos.container}
+    >
+      <TouchableOpacity style={estilos.botaoVoltar} onPress={() => roteador.back()}>
+        <Image
+          source={require('../assets/seta-para-a-esquerda.png')}
+          style={estilos.iconeVoltar}
+        />
+        <Text style={estilos.textoVoltar}>Voltar</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Laboratórios</Text>
-      <Text style={styles.subtitle}>Consulte a disponibilidade</Text>
+      <Text style={estilos.titulo}>Laboratórios</Text>
+      <Text style={estilos.subtitulo}>Consulte a disponibilidade</Text>
 
-      {labs.map((lab, i) => {
-        const isSelected = lab.nome === selectedLab.nome;
-        const sc = lab.status === 'Disponível' ? '#22c55e' : '#ED145B';
+      {laboratorios.map((lab, indice) => {
+        const estaSelecionado = lab.nome === labSelecionado.nome;
+        const corStatus = lab.status === 'Disponível' ? Cores.sucesso : Cores.erro;
         return (
           <TouchableOpacity
-            key={i}
-            style={[styles.labCard, isSelected && styles.labCardSelected]}
-            onPress={() => setSelectedLab(lab)}
+            key={indice}
+            style={[estilos.cardLab, estaSelecionado && estilos.cardLabSelecionado]}
+            onPress={() => setLabSelecionado(lab)}
           >
-            <View style={styles.labCardLeft}>
-              <Image source={require('../assets/lab-icon.png')} style={styles.labIcon} />
+            <View style={estilos.ladoEsquerdoCard}>
+              <Image source={require('../assets/lab-icon.png')} style={estilos.iconeLab} />
               <View>
-                <Text style={styles.labNome}>{lab.nome}</Text>
-                <Text style={styles.labLoc}>{lab.andar} · {lab.sala}</Text>
+                <Text style={estilos.nomeLab}>{lab.nome}</Text>
+                <Text style={estilos.localizacaoLab}>{lab.andar} · {lab.sala}</Text>
               </View>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: sc }]}>
-              <Text style={styles.statusText}>{lab.status}</Text>
+            <View style={[estilos.badgeStatus, { backgroundColor: corStatus }]}>
+              <Text style={estilos.textoStatus}>{lab.status}</Text>
             </View>
           </TouchableOpacity>
         );
       })}
 
-      <Text style={styles.agendaTitle}>Agenda - {selectedLab.nome}</Text>
-      <Text style={styles.agendaLoc}>{selectedLab.andar} · {selectedLab.sala}</Text>
+      <Text style={estilos.tituloAgenda}>Agenda - {labSelecionado.nome}</Text>
+      <Text style={estilos.localizacaoAgenda}>{labSelecionado.andar} · {labSelecionado.sala}</Text>
 
-      {Object.entries(selectedLab.agenda).map(([dia, aulas]) => (
-        <View key={dia} style={styles.diaBlock}>
-          <Text style={styles.diaNome}>{dia}</Text>
+      {Object.entries(labSelecionado.agenda).map(([dia, aulas]) => (
+        <View key={dia} style={estilos.blocoDia}>
+          <Text style={estilos.nomeDia}>{dia}</Text>
           {aulas.length === 0 ? (
-            <View style={styles.aulaCard}>
-              <Text style={styles.semAula}>Sem agendamentos{'\n'}até o momento.</Text>
+            <View style={estilos.cardAula}>
+              <Text style={estilos.semAula}>Sem agendamentos{'\n'}até o momento.</Text>
             </View>
           ) : (
             aulas.map((aula, j) => (
-              <View key={j} style={styles.aulaCard}>
-                <View style={styles.aulaBorder} />
-                <View style={styles.aulaInfo}>
-                  <Text style={styles.aulaDisciplina}>{aula.disciplina}</Text>
-                  <Text style={styles.aulaProf}>{aula.professor}</Text>
+              <View key={j} style={estilos.cardAula}>
+                <View style={estilos.bordaAula} />
+                <View style={estilos.infoAula}>
+                  <Text style={estilos.disciplinaAula}>{aula.disciplina}</Text>
+                  <Text style={estilos.professorAula}>{aula.professor}</Text>
                 </View>
-                <View style={styles.aulaHorario}>
-                  <Text style={styles.aulaHorarioText}>{aula.inicio} - {aula.fim}</Text>
+                <View style={estilos.horarioAula}>
+                  <Text style={estilos.textoHorario}>{aula.inicio} - {aula.fim}</Text>
                 </View>
               </View>
             ))
           )}
         </View>
       ))}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#0a0a0a' },
+const estilos = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: Cores.fundo },
   container: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 50 },
 
-  backBtn: {
-    backgroundColor: '#ED145B',
+  botaoVoltar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
     marginBottom: 28,
+    gap: 8,
   },
-  backText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  iconeVoltar: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
+  textoVoltar: { color: Cores.primario, fontWeight: '700', fontSize: 14 },
 
-  title: { color: '#ED145B', fontSize: 34, fontWeight: '900', marginBottom: 4 },
-  subtitle: { color: '#888', fontSize: 14, marginBottom: 24 },
+  titulo: { color: Cores.primario, fontSize: 34, fontWeight: '900', marginBottom: 4 },
+  subtitulo: { color: Cores.textoApagado, fontSize: 14, marginBottom: 24 },
 
-  labCard: {
-    backgroundColor: '#141414',
+  cardLab: {
+    backgroundColor: Cores.superficie,
     borderRadius: 10,
     padding: 14,
     marginBottom: 12,
@@ -132,47 +147,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  labCardSelected: {
-    borderWidth: 1,
-    borderColor: '#ED145B',
-  },
-  labCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  labNome: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  labLoc: { color: '#777', fontSize: 12, marginTop: 2 },
-  statusBadge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  statusText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  cardLabSelecionado: { borderWidth: 1, borderColor: Cores.primario },
+  ladoEsquerdoCard: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  nomeLab: { color: Cores.textoPrimario, fontWeight: '700', fontSize: 14 },
+  localizacaoLab: { color: Cores.textoApagado, fontSize: 12, marginTop: 2 },
+  badgeStatus: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
+  textoStatus: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  agendaTitle: { color: '#fff', fontWeight: '900', fontSize: 18, marginTop: 24, marginBottom: 2 },
-  agendaLoc: { color: '#777', fontSize: 12, marginBottom: 20 },
+  tituloAgenda: { color: Cores.textoPrimario, fontWeight: '900', fontSize: 18, marginTop: 24, marginBottom: 2 },
+  localizacaoAgenda: { color: Cores.textoApagado, fontSize: 12, marginBottom: 20 },
 
-  diaBlock: { marginBottom: 16 },
-  diaNome: { color: '#ED145B', fontWeight: '700', fontSize: 12, letterSpacing: 1, marginBottom: 8 },
+  blocoDia: { marginBottom: 16 },
+  nomeDia: { color: Cores.primario, fontWeight: '700', fontSize: 12, letterSpacing: 1, marginBottom: 8 },
 
-  aulaCard: {
-    backgroundColor: '#141414',
+  cardAula: {
+    backgroundColor: Cores.superficie,
     borderRadius: 8,
     padding: 14,
     marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  aulaBorder: {
-    width: 3,
-    height: '100%',
-    backgroundColor: '#ED145B',
-    borderRadius: 2,
-    marginRight: 12,
-    minHeight: 36,
-  },
-  aulaInfo: { flex: 1 },
-  aulaDisciplina: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  aulaProf: { color: '#777', fontSize: 12, marginTop: 2 },
-  aulaHorario: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  aulaHorarioText: { color: '#ED145B', fontSize: 11, fontWeight: '700' },
+  bordaAula: { width: 3, height: '100%', backgroundColor: Cores.primario, borderRadius: 2, marginRight: 12, minHeight: 36 },
+  infoAula: { flex: 1 },
+  disciplinaAula: { color: Cores.textoPrimario, fontWeight: '700', fontSize: 13 },
+  professorAula: { color: Cores.textoApagado, fontSize: 12, marginTop: 2 },
+  horarioAula: { backgroundColor: Cores.superficieAlternativa, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
+  textoHorario: { color: Cores.primario, fontSize: 11, fontWeight: '700' },
   semAula: { color: '#666', fontSize: 13, lineHeight: 20 },
+  iconeLab: { width: 28, height: 28, resizeMode: 'contain' },
 });
