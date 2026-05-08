@@ -3,148 +3,299 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  TextInput,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Animated } from 'react-native';
+import { useDadosApp } from '../context/ContextoDadosApp';
+import Entrada from '../components/Entrada';
+import Botao from '../components/Botao';
+import Notificacao from '../components/Notificacao';
+import BarraDeBusca from '../components/BarraDeBusca';
+import ListaVazia from '../components/ListaVazia';
+import { Cores } from '../constants/cores';
+import { useValidacao, Regras } from '../hooks/useValidacao';
 
-const equipamentos = ['Computador', 'Projetor', 'Ar-condicionado', 'Impressora', 'Monitor', 'Outro'];
-
-const problemasIniciais = [
-  { equipamento: 'Projetor', local: 'Sala 301', descricao: 'Sem sinal de imagem', status: 'Em análise' },
-  { equipamento: 'Computador', local: 'Sala 210', descricao: 'Não liga', status: 'Resolvido' },
-  { equipamento: 'Ar-condicionado', local: 'Sala 502', descricao: 'Não liga', status: 'Pendente' },
-];
-
-const STATUS_COLORS = { Pendente: '#ED145B', 'Em análise': '#f59e0b', Resolvido: '#22c55e' };
+const listaEquipamentos = ['Computador', 'Projetor', 'Ar-condicionado', 'Impressora', 'Monitor', 'Outro'];
+const CORES_STATUS = { Pendente: Cores.erro, 'Em análise': Cores.destaque, Resolvido: Cores.sucesso };
 
 export default function Problemas() {
-  const router = useRouter();
-  const [showForm, setShowForm] = useState(false);
-  const [equipamento, setEquipamento] = useState(null);
-  const [local, setLocal] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [lista, setLista] = useState(problemasIniciais);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const roteador = useRouter();
+  const { problemas, carregandoProblemas, adicionarProblema } = useDadosApp();
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [equipamentoSelecionado, setEquipamentoSelecionado] = useState(null);
+  const [erroEquipamento, setErroEquipamento] = useState('');
+  const [mostrarSucesso, setMostrarSucesso] = useState(false);
+  const [textoBusca, setTextoBusca] = useState('');
 
-  function handleEnviar() {
-    if (!equipamento || !local.trim()) return;
-    setLista([{ equipamento, local: local.trim(), descricao: descricao.trim(), status: 'Pendente' }, ...lista]);
-    setEquipamento(null);
-    setLocal('');
-    setDescricao('');
-    setShowForm(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3500);
+  const animacaoOpacidade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(animacaoOpacidade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
+  const { valores, erros, camposChacoalhando, definirValor, tocar, validar, redefinir } = useValidacao(
+    { local: '', descricao: '' },
+    {
+      local: [Regras.obrigatorio('Local')],
+    }
+  );
+
+  // Filtragem em tempo real
+  const listaFiltrada = problemas.filter((item) => {
+    const busca = textoBusca.toLowerCase();
+    return (
+      item.equipamento.toLowerCase().includes(busca) ||
+      item.local.toLowerCase().includes(busca) ||
+      item.status.toLowerCase().includes(busca) ||
+      (item.descricao && item.descricao.toLowerCase().includes(busca))
+    );
+  });
+
+  async function handleEnviar() {
+    if (!equipamentoSelecionado) {
+      setErroEquipamento('Selecione um equipamento.');
+      return;
+    }
+    setErroEquipamento('');
+    if (!validar()) return;
+
+    await adicionarProblema({
+      equipamento: equipamentoSelecionado,
+      local: valores.local.trim(),
+      descricao: valores.descricao.trim(),
+      status: 'Pendente',
+    });
+    setEquipamentoSelecionado(null);
+    redefinir();
+    setMostrarFormulario(false);
+    setMostrarSucesso(true);
+    setTimeout(() => setMostrarSucesso(false), 3500);
+  }
+
+  function renderizarItem({ item }) {
+    return (
+      <View style={estilos.card}>
+        <View style={estilos.cardEsquerda}>
+          <Text style={estilos.cardEquipamento}>{item.equipamento}</Text>
+          <Text style={estilos.cardLocal}>{item.local}</Text>
+          {!!item.descricao && <Text style={estilos.cardDescricao}>{item.descricao}</Text>}
+        </View>
+        <View style={[estilos.badgeStatus, { backgroundColor: CORES_STATUS[item.status] || '#555' }]}>
+          <Text style={estilos.textoStatus}>{item.status}</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.wrapper}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>Voltar</Text>
-        </TouchableOpacity>
+    <KeyboardAvoidingView
+      style={estilos.tela}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <Animated.View style={[estilos.tela, { opacity: animacaoOpacidade }]}>
+        <FlatList
+          data={listaFiltrada}
+          keyExtractor={(item) => item.id}
+          renderItem={renderizarItem}
+          contentContainerStyle={estilos.container}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            carregandoProblemas ? (
+              <ActivityIndicator color={Cores.primario} style={{ marginTop: 40 }} />
+            ) : (
+              <ListaVazia
+                mensagem={
+                  textoBusca
+                    ? `Nenhum resultado para "${textoBusca}".`
+                    : 'Nenhum problema relatado ainda.\nClique em "Relatar Problema".'
+                }
+              />
+            )
+          }
+          ListHeaderComponent={
+            <View>
+              {/* Botão Voltar */}
+              <TouchableOpacity style={estilos.botaoVoltar} onPress={() => roteador.back()}>
+                <Image
+                  source={require('../assets/seta-para-a-esquerda.png')}
+                  style={estilos.iconeVoltar}
+                />
+                <Text style={estilos.textoVoltar}>Voltar</Text>
+              </TouchableOpacity>
 
-        <Text style={styles.title}>Problemas</Text>
-        <Text style={styles.subtitle}>Informe problemas técnicos nos equipamentos</Text>
+              <Text style={estilos.titulo}>Problemas</Text>
+              <Text style={estilos.subtitulo}>Informe problemas técnicos nos equipamentos</Text>
 
-        <TouchableOpacity style={styles.newBtn} onPress={() => setShowForm(!showForm)}>
-          <Text style={styles.newBtnText}>+ Relatar Problema</Text>
-        </TouchableOpacity>
+              <TouchableOpacity
+                style={estilos.botaoNovo}
+                onPress={() => setMostrarFormulario(!mostrarFormulario)}
+              >
+                <Text style={estilos.textoBotaoNovo}>
+                  {mostrarFormulario ? 'Cancelar' : 'Relatar Problema'}
+                </Text>
+              </TouchableOpacity>
 
-        {showForm && (
-          <View style={styles.formCard}>
-            <Text style={styles.label}>Equipamento</Text>
-            <View style={styles.grid}>
-              {equipamentos.map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[styles.tipoBtn, equipamento === item && styles.tipoBtnActive]}
-                  onPress={() => setEquipamento(item)}
-                >
-                  <Text style={[styles.tipoBtnText, equipamento === item && styles.tipoBtnTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+              {mostrarFormulario && (
+                <View style={estilos.cardFormulario}>
+                  <Text style={estilos.rotulo}>Equipamento</Text>
+                  <View style={estilos.grade}>
+                    {listaEquipamentos.map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          estilos.botaoEquipamento,
+                          equipamentoSelecionado === item && estilos.botaoEquipamentoAtivo,
+                        ]}
+                        onPress={() => {
+                          setEquipamentoSelecionado(item);
+                          setErroEquipamento('');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            estilos.textoBotaoEquipamento,
+                            equipamentoSelecionado === item && estilos.textoBotaoEquipamentoAtivo,
+                          ]}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {erroEquipamento ? (
+                    <Text style={estilos.erroCampo}>{erroEquipamento}</Text>
+                  ) : null}
+
+                  <Entrada
+                    rotulo="Local"
+                    placeholder="Ex.: 3º Andar, Sala 305"
+                    value={valores.local}
+                    onChangeText={(v) => definirValor('local', v)}
+                    onBlur={() => tocar('local')}
+                    erro={erros.local}
+                    chacoalhar={camposChacoalhando.local}
+                  />
+
+                  <Entrada
+                    rotulo="Descrição do problema"
+                    placeholder="Descreva o que está acontecendo..."
+                    value={valores.descricao}
+                    onChangeText={(v) => definirValor('descricao', v)}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                    style={{ minHeight: 70, paddingTop: 10 }}
+                  />
+
+                  <Botao titulo="Enviar relato" aoPresionar={handleEnviar} estilo={estilos.botaoEnviar} />
+                </View>
+              )}
+
+              {/* Barra de busca com ícone de lupa */}
+              <BarraDeBusca
+                valor={textoBusca}
+                aoMudar={setTextoBusca}
+                placeholder="Buscar por equipamento, local ou status..."
+              />
+
+              {problemas.length > 0 && (
+                <Text style={estilos.textoContador}>
+                  {listaFiltrada.length} de {problemas.length} problema(s)
+                </Text>
+              )}
             </View>
-            <Text style={styles.label}>Local</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex.: 3º Andar, Sala 305"
-              placeholderTextColor="#444"
-              value={local}
-              onChangeText={setLocal}
-            />
-            <Text style={styles.label}>Descrição do problema</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Descreva o que está acontecendo..."
-              placeholderTextColor="#444"
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              value={descricao}
-              onChangeText={setDescricao}
-            />
-            <TouchableOpacity style={styles.submitBtn} onPress={handleEnviar}>
-              <Text style={styles.submitBtnText}>Enviar relato</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          }
+        />
+      </Animated.View>
 
-        {lista.map((item, i) => (
-          <View key={i} style={styles.card}>
-            <View style={styles.cardLeft}>
-              <Text style={styles.cardEquip}>{item.equipamento}</Text>
-              <Text style={styles.cardLocal}>{item.local}</Text>
-              {!!item.descricao && <Text style={styles.cardDesc}>{item.descricao}</Text>}
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] || '#555' }]}>
-              <Text style={styles.statusText}>{item.status}</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-
-      {showSuccess && (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>Problema relatado com sucesso!</Text>
-          <Text style={styles.toastSub}>Nossa equipe técnica foi notificada.</Text>
-        </View>
-      )}
-    </View>
+      <Notificacao
+        visivel={mostrarSucesso}
+        mensagem="Problema relatado com sucesso!"
+        sub="Nossa equipe técnica foi notificada."
+        tipo="sucesso"
+      />
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: '#0a0a0a' },
-  scroll: { flex: 1 },
+const estilos = StyleSheet.create({
+  tela: { flex: 1, backgroundColor: Cores.fundo },
   container: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 50 },
-  backBtn: { backgroundColor: '#ED145B', alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, marginBottom: 28 },
-  backText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  title: { color: '#ED145B', fontSize: 34, fontWeight: '900', marginBottom: 4 },
-  subtitle: { color: '#888', fontSize: 14, marginBottom: 24 },
-  newBtn: { backgroundColor: '#ED145B', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginBottom: 20, alignSelf: 'flex-start', paddingHorizontal: 20 },
-  newBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  formCard: { backgroundColor: '#141414', borderBottomRightRadius: 10, borderTopRightRadius: 10, padding: 18, marginBottom: 24, borderLeftWidth: 3, borderLeftColor: '#ED145B' },
-  label: { color: '#ccc', fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  tipoBtn: { backgroundColor: '#1e1e1e', borderRadius: 6, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: '#2a2a2a', marginBottom: 4 },
-  tipoBtnActive: { backgroundColor: '#ED145B', borderColor: '#ED145B' },
-  tipoBtnText: { color: '#aaa', fontWeight: '600', fontSize: 13 },
-  tipoBtnTextActive: { color: '#fff' },
-  input: { backgroundColor: '#1a1a1a', borderRadius: 6, color: '#fff', paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#252525' },
-  textArea: { minHeight: 70, paddingTop: 10 },
-  submitBtn: { backgroundColor: '#ED145B', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  card: { backgroundColor: '#141414', borderRadius: 8, padding: 16, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardLeft: { flex: 1, paddingRight: 10 },
-  cardEquip: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 2 },
-  cardLocal: { color: '#777', fontSize: 12, marginBottom: 4 },
-  cardDesc: { color: '#999', fontSize: 12 },
-  statusBadge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  statusText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  toast: { position: 'absolute', bottom: 40, left: 20, right: 20, backgroundColor: '#1a3a2a', borderBottomRightRadius: 10, borderTopRightRadius: 10, paddingVertical: 16, paddingHorizontal: 20, borderLeftWidth: 4, borderLeftColor: '#22c55e' },
-  toastText: { color: '#22c55e', fontWeight: '700', fontSize: 14, marginBottom: 4 },
-  toastSub: { color: '#5a9a6a', fontSize: 12 },
+
+  botaoVoltar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 28,
+    gap: 8,
+  },
+  iconeVoltar: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
+  textoVoltar: { color: Cores.primario, fontWeight: '700', fontSize: 14 },
+
+  titulo: { color: Cores.primario, fontSize: 34, fontWeight: '900', marginBottom: 4 },
+  subtitulo: { color: Cores.textoApagado, fontSize: 14, marginBottom: 24 },
+
+  botaoNovo: {
+    backgroundColor: Cores.primario,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 20,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 20,
+  },
+  textoBotaoNovo: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  cardFormulario: {
+    backgroundColor: Cores.superficie,
+    borderBottomRightRadius: 10,
+    borderTopRightRadius: 10,
+    padding: 18,
+    marginBottom: 24,
+    borderLeftWidth: 3,
+    borderLeftColor: Cores.primario,
+  },
+  rotulo: { color: Cores.textoSecundario, fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 10 },
+  grade: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  botaoEquipamento: {
+    backgroundColor: Cores.superficieAlternativa,
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: Cores.borda,
+    marginBottom: 4,
+  },
+  botaoEquipamentoAtivo: { backgroundColor: Cores.primario, borderColor: Cores.primario },
+  textoBotaoEquipamento: { color: Cores.textoApagado, fontWeight: '600', fontSize: 13 },
+  textoBotaoEquipamentoAtivo: { color: '#fff' },
+  erroCampo: { color: Cores.erro, fontSize: 12, marginTop: 4, marginBottom: 4 },
+  botaoEnviar: { marginTop: 16 },
+
+  textoContador: { color: Cores.textoDesabilitado, fontSize: 12, marginBottom: 8 },
+
+  card: {
+    backgroundColor: Cores.superficie,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardEsquerda: { flex: 1, paddingRight: 10 },
+  cardEquipamento: { color: Cores.textoPrimario, fontWeight: '700', fontSize: 15, marginBottom: 2 },
+  cardLocal: { color: Cores.textoApagado, fontSize: 12, marginBottom: 4 },
+  cardDescricao: { color: '#999', fontSize: 12 },
+  badgeStatus: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
+  textoStatus: { color: '#fff', fontSize: 11, fontWeight: '700' },
 });

@@ -29,6 +29,7 @@ export function ProvedorDadosApp({ children }) {
   const [carregandoSoftwares, setCarregandoSoftwares] = useState(true);
   const [carregandoProblemas, setCarregandoProblemas] = useState(true);
 
+  // Carrega softwares do AsyncStorage ao montar
   useEffect(() => {
     async function carregarSoftwares() {
       try {
@@ -36,6 +37,7 @@ export function ProvedorDadosApp({ children }) {
         if (json) {
           setSoftwares(JSON.parse(json));
         } else {
+          // Primeira execução: salva dados iniciais
           await AsyncStorage.setItem(
             CHAVES_ARMAZENAMENTO.SOFTWARES,
             JSON.stringify(softwaresIniciais)
@@ -51,6 +53,7 @@ export function ProvedorDadosApp({ children }) {
     carregarSoftwares();
   }, []);
 
+  // Carrega problemas do AsyncStorage ao montar
   useEffect(() => {
     async function carregarProblemas() {
       try {
@@ -73,6 +76,7 @@ export function ProvedorDadosApp({ children }) {
     carregarProblemas();
   }, []);
 
+  // Adiciona software e persiste
   async function adicionarSoftware(item) {
     const novoItem = { ...item, id: Date.now().toString() };
     const novaLista = [novoItem, ...softwares];
@@ -80,6 +84,7 @@ export function ProvedorDadosApp({ children }) {
     await AsyncStorage.setItem(CHAVES_ARMAZENAMENTO.SOFTWARES, JSON.stringify(novaLista));
   }
 
+  // Adiciona problema e persiste
   async function adicionarProblema(item) {
     const novoItem = { ...item, id: Date.now().toString() };
     const novaLista = [novoItem, ...problemas];

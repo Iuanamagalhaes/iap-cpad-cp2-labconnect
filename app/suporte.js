@@ -4,185 +4,178 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { Animated } from 'react-native';
+import Entrada from '../components/Entrada';
+import Botao from '../components/Botao';
+import Notificacao from '../components/Notificacao';
+import { Cores } from '../constants/cores';
+import { useValidacao, Regras } from '../hooks/useValidacao';
 
 export default function Suporte() {
-  const router = useRouter();
+  const roteador = useRouter();
+  const [mostrarSucesso, setMostrarSucesso] = useState(false);
 
-  const [nome, setNome] = useState('');
-  const [sala, setSala] = useState('');
-  const [andar, setAndar] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
+  const animacaoOpacidade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(animacaoOpacidade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
+  const { valores, erros, camposChacoalhando, definirValor, tocar, validar, redefinir } = useValidacao(
+    { nome: '', sala: '', motivo: '' },
+    {
+      nome: [Regras.obrigatorio('Nome')],
+      sala: [Regras.obrigatorio('Sala')],
+    }
+  );
 
   function handleEnviar() {
-    if (!nome.trim() || !sala.trim()) return;
-    setShowSuccess(true);
-    setNome(''); setSala(''); setAndar(''); setMotivo('');
-    setTimeout(() => setShowSuccess(false), 4000);
+    if (!validar()) return;
+    setMostrarSucesso(true);
+    redefinir();
+    setTimeout(() => setMostrarSucesso(false), 4000);
   }
 
   return (
-    <View style={styles.wrapper}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>Voltar</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Suporte Rápido</Text>
-        <Text style={styles.subtitle}>Ajuda imediata</Text>
-
-        <View style={styles.infoBanner}>
-          <Text style={styles.infoBannerText}>
-            Tempo médio de chegada:{' '}
-            <Text style={styles.infoBannerHighlight}>10–15 minutos</Text>
-          </Text>
-        </View>
-
-        <View style={styles.formCard}>
-          <Text style={styles.cardDesc}>
-            Preencha os dados abaixo e um técnico será enviado diretamente à sua sala.
-          </Text>
-
-          <Text style={styles.label}>Seu nome</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex.: Prof. João Silva"
-            placeholderTextColor="#444"
-            value={nome}
-            onChangeText={setNome}
-          />
-
-          <Text style={styles.label}>Sala atual</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex.: Sala 502"
-            placeholderTextColor="#444"
-            value={sala}
-            onChangeText={setSala}
-          />
-
-          <Text style={styles.label}>Motivo</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Descreva brevemente o que está acontecendo..."
-            placeholderTextColor="#444"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            value={motivo}
-            onChangeText={setMotivo}
-          />
-
-          <TouchableOpacity style={styles.submitBtn} onPress={handleEnviar}>
-            <Text style={styles.submitBtnText}>Chamar técnico agora</Text>
+    <KeyboardAvoidingView
+      style={estilos.tela}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <Animated.View style={[estilos.tela, { opacity: animacaoOpacidade }]}>
+        <ScrollView
+          style={estilos.scroll}
+          contentContainerStyle={estilos.container}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Botão Voltar */}
+          <TouchableOpacity style={estilos.botaoVoltar} onPress={() => roteador.back()}>
+            <Image
+              source={require('../assets/seta-para-a-esquerda.png')}
+              style={estilos.iconeVoltar}
+            />
+            <Text style={estilos.textoVoltar}>Voltar</Text>
           </TouchableOpacity>
-        </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Horário de atendimento do HelpCenter:{'\n'}
-            <Text style={styles.footerHighlight}>Segunda a Sexta, 08h00 – 18h30</Text>
-          </Text>
-        </View>
-      </ScrollView>
+          <Text style={estilos.titulo}>Suporte Rápido</Text>
+          <Text style={estilos.subtitulo}>Ajuda imediata</Text>
 
-      {showSuccess && (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>Técnico acionado com sucesso!</Text>
-          <Text style={styles.toastSub}>Nossa equipe está a caminho da sua sala.</Text>
-        </View>
-      )}
-    </View>
+          <View style={estilos.avisoTempo}>
+            <Text style={estilos.textoAviso}>
+              Tempo médio de chegada:{' '}
+              <Text style={estilos.textoAvisoDestaque}>10–15 minutos</Text>
+            </Text>
+          </View>
+
+          <View style={estilos.cardFormulario}>
+            <Text style={estilos.descricaoFormulario}>
+              Preencha os dados abaixo e um técnico será enviado diretamente à sua sala.
+            </Text>
+
+            <Entrada
+              rotulo="Seu nome"
+              placeholder="Ex.: Prof. João Silva"
+              value={valores.nome}
+              onChangeText={(v) => definirValor('nome', v)}
+              onBlur={() => tocar('nome')}
+              erro={erros.nome}
+              chacoalhar={camposChacoalhando.nome}
+              autoCapitalize="words"
+            />
+
+            <Entrada
+              rotulo="Sala atual"
+              placeholder="Ex.: Sala 502"
+              value={valores.sala}
+              onChangeText={(v) => definirValor('sala', v)}
+              onBlur={() => tocar('sala')}
+              erro={erros.sala}
+              chacoalhar={camposChacoalhando.sala}
+            />
+
+            <Entrada
+              rotulo="Motivo (opcional)"
+              placeholder="Descreva brevemente o que está acontecendo..."
+              value={valores.motivo}
+              onChangeText={(v) => definirValor('motivo', v)}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              style={{ minHeight: 90, paddingTop: 12 }}
+            />
+
+            <Botao titulo="Chamar técnico agora" aoPresionar={handleEnviar} estilo={estilos.botaoEnviar} />
+          </View>
+
+          <View style={estilos.rodape}>
+            <Text style={estilos.textoRodape}>
+              Horário de atendimento do HelpCenter:{'\n'}
+              <Text style={estilos.textoRodapeDestaque}>Segunda a Sexta, 08h00 – 18h30</Text>
+            </Text>
+          </View>
+        </ScrollView>
+      </Animated.View>
+
+      <Notificacao
+        visivel={mostrarSucesso}
+        mensagem="Técnico acionado com sucesso!"
+        sub="Nossa equipe está a caminho da sua sala."
+        tipo="sucesso"
+      />
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: '#0a0a0a' },
+const estilos = StyleSheet.create({
+  tela: { flex: 1, backgroundColor: Cores.fundo },
   scroll: { flex: 1 },
   container: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 60 },
 
-  backBtn: {
-    backgroundColor: '#ED145B',
+  botaoVoltar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
     marginBottom: 28,
+    gap: 8,
   },
-  backText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  iconeVoltar: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
+  textoVoltar: { color: Cores.primario, fontWeight: '700', fontSize: 14 },
 
-  title: { color: '#ED145B', fontSize: 34, fontWeight: '900', marginBottom: 4 },
-  subtitle: { color: '#888', fontSize: 14, marginBottom: 20 },
+  titulo: { color: Cores.primario, fontSize: 34, fontWeight: '900', marginBottom: 4 },
+  subtitulo: { color: Cores.textoApagado, fontSize: 14, marginBottom: 20 },
 
-  infoBanner: {
-    backgroundColor: '#1e1a10',
+  avisoTempo: {
+    backgroundColor: Cores.fundoAviso,
     borderBottomRightRadius: 10,
     borderTopRightRadius: 10,
     padding: 14,
     marginBottom: 20,
     borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: Cores.destaque,
   },
-  infoBannerText: { color: '#aaa', fontSize: 13 },
-  infoBannerHighlight: { color: '#f59e0b', fontWeight: '700' },
+  textoAviso: { color: Cores.textoApagado, fontSize: 13 },
+  textoAvisoDestaque: { color: Cores.destaque, fontWeight: '700' },
 
-  formCard: {
-    backgroundColor: '#141414',
-      borderBottomRightRadius: 10,
+  cardFormulario: {
+    backgroundColor: Cores.superficie,
+    borderBottomRightRadius: 10,
     borderTopRightRadius: 10,
     padding: 20,
     borderLeftWidth: 3,
-    borderLeftColor: '#ED145B',
+    borderLeftColor: Cores.primario,
   },
-  cardDesc: { color: '#777', fontSize: 13, lineHeight: 19 },
+  descricaoFormulario: { color: Cores.textoApagado, fontSize: 13, lineHeight: 19 },
+  botaoEnviar: { marginTop: 20 },
 
-  label: { color: '#ccc', fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 14 },
-  input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 6,
-    color: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#252525',
-  },
-  textArea: { minHeight: 90, paddingTop: 12 },
-
-  submitBtn: {
-    backgroundColor: '#ED145B',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  footer: { marginTop: 28, alignItems: 'center' },
-  footerText: { color: '#444', fontSize: 12, textAlign: 'center', lineHeight: 20 },
-  footerHighlight: { color: '#666', fontWeight: '700' },
-
-  toast: {
-    position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    backgroundColor: '#1a3a2a',
-    borderBottomRightRadius: 10,
-    borderTopRightRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#22c55e',
-  },
-  toastText: { color: '#22c55e', fontWeight: '700', fontSize: 14, marginBottom: 4 },
-  toastSub: { color: '#5a9a6a', fontSize: 12 },
+  rodape: { marginTop: 28, alignItems: 'center' },
+  textoRodape: { color: Cores.textoDesabilitado, fontSize: 12, textAlign: 'center', lineHeight: 20 },
+  textoRodapeDestaque: { color: '#666', fontWeight: '700' },
 });

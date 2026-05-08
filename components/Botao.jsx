@@ -12,7 +12,7 @@ export default function Botao({
   aoPresionar,
   carregando = false,
   desabilitado = false,
-  variante = 'primario',
+  variante = 'primario', // 'primario' | 'contorno' | 'fantasma'
   estilo,
   estiloTexto,
 }) {

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/ContextoAuth';
-import Entrada from '../../components/Input';
+import Entrada from '../../components/Entrada';
 import Botao from '../../components/Botao';
 import { Cores } from '../../constants/cores';
 import { useValidacao, Regras } from '../../hooks/useValidacao';

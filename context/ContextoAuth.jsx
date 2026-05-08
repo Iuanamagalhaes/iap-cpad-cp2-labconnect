@@ -12,6 +12,7 @@ export function ProvedorAuth({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [carregando, setCarregando] = useState(true);
 
+  // Ao montar, verifica se há sessão persistida
   useEffect(() => {
     async function carregarSessao() {
       try {
@@ -28,6 +29,7 @@ export function ProvedorAuth({ children }) {
     carregarSessao();
   }, []);
 
+  // Cadastro: persiste usuário no array de usuários
   async function cadastrar({ nome, email, senha }) {
     try {
       const usuariosJson = await AsyncStorage.getItem(CHAVES_ARMAZENAMENTO.USUARIOS);
@@ -51,6 +53,7 @@ export function ProvedorAuth({ children }) {
     }
   }
 
+  // Login: valida credenciais e persiste sessão
   async function login({ email, senha }) {
     try {
       const usuariosJson = await AsyncStorage.getItem(CHAVES_ARMAZENAMENTO.USUARIOS);
@@ -77,6 +80,7 @@ export function ProvedorAuth({ children }) {
     }
   }
 
+  // Logout: limpa sessão e estado
   async function sair() {
     try {
       await AsyncStorage.removeItem(CHAVES_ARMAZENAMENTO.SESSAO);

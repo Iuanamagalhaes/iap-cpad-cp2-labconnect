@@ -3,127 +3,203 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  TextInput,
-  Modal,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Animated } from 'react-native';
+import { useDadosApp } from '../context/ContextoDadosApp';
+import Entrada from '../components/Entrada';
+import Botao from '../components/Botao';
+import Notificacao from '../components/Notificacao';
+import BarraDeBusca from '../components/BarraDeBusca';
+import ListaVazia from '../components/ListaVazia';
+import { Cores } from '../constants/cores';
+import { useValidacao, Regras } from '../hooks/useValidacao';
 
-const STATUS_COLORS = {
-  Pendente: '#ED145B',
-  Concluído: '#22c55e',
-  'Em andamento': '#f59e0b',
+const CORES_STATUS = {
+  Pendente: Cores.erro,
+  Concluído: Cores.sucesso,
+  'Em andamento': Cores.destaque,
 };
 
-const initialLista = [
-  { nome: 'Android Studio', sala: 'Sala 502', status: 'Pendente' },
-  { nome: 'VS Code', sala: 'Sala 103', status: 'Concluído' },
-  { nome: 'MATLAB', sala: 'Sala 301', status: 'Em andamento' },
-  { nome: 'AutoCAD', sala: 'Sala 210', status: 'Concluído' },
-  { nome: 'Python', sala: 'Sala 405', status: 'Pendente' },
-  { nome: 'Arduino IDE', sala: 'Sala 602', status: 'Concluído' },
-];
-
 export default function Softwares() {
-  const router = useRouter();
-  const [lista, setLista] = useState(initialLista);
-  const [showForm, setShowForm] = useState(false);
-  const [nomeSoftware, setNomeSoftware] = useState('');
-  const [sala, setSala] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
+  const roteador = useRouter();
+  const { softwares, carregandoSoftwares, adicionarSoftware } = useDadosApp();
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [mostrarSucesso, setMostrarSucesso] = useState(false);
+  const [textoBusca, setTextoBusca] = useState('');
 
-  function handleEnviar() {
-    if (!nomeSoftware.trim() || !sala.trim()) return;
-    const nova = { nome: nomeSoftware.trim(), sala: sala.trim(), status: 'Pendente' };
-    setLista([nova, ...lista]);
-    setNomeSoftware('');
-    setSala('');
-    setShowForm(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+  const animacaoOpacidade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(animacaoOpacidade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
+  const { valores, erros, camposChacoalhando, definirValor, tocar, validar, redefinir } = useValidacao(
+    { nomeSoftware: '', sala: '' },
+    {
+      nomeSoftware: [Regras.obrigatorio('Nome do software')],
+      sala: [Regras.obrigatorio('Sala')],
+    }
+  );
+
+  const listaFiltrada = softwares.filter((item) => {
+    const busca = textoBusca.toLowerCase();
+    return (
+      item.nome.toLowerCase().includes(busca) ||
+      item.sala.toLowerCase().includes(busca) ||
+      item.status.toLowerCase().includes(busca)
+    );
+  });
+
+  async function handleEnviar() {
+    if (!validar()) return;
+    await adicionarSoftware({ nome: valores.nomeSoftware.trim(), sala: valores.sala.trim(), status: 'Pendente' });
+    redefinir();
+    setMostrarFormulario(false);
+    setMostrarSucesso(true);
+    setTimeout(() => setMostrarSucesso(false), 3000);
+  }
+
+  function renderizarItem({ item }) {
+    return (
+      <View style={estilos.card}>
+        <View>
+          <Text style={estilos.cardTitulo}>{item.nome}</Text>
+          <Text style={estilos.cardSala}>{item.sala}</Text>
+        </View>
+        <View style={[estilos.badgeStatus, { backgroundColor: CORES_STATUS[item.status] || '#555' }]}>
+          <Text style={estilos.textoStatus}>{item.status}</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.wrapper}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>Voltar</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Instalação de{'\n'}Software</Text>
-        <Text style={styles.subtitle}>Solicite a instalação de softwares para o andamento das aulas</Text>
-
-        <TouchableOpacity style={styles.newBtn} onPress={() => setShowForm(!showForm)}>
-          <Text style={styles.newBtnText}>+ Nova Solicitação</Text>
-        </TouchableOpacity>
-
-        {showForm && (
-          <View style={styles.formCard}>
-            <Text style={styles.label}>Nome do Software</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex.: AutoCAD, MATLAB..."
-              placeholderTextColor="#555"
-              value={nomeSoftware}
-              onChangeText={setNomeSoftware}
-            />
-            <Text style={styles.label}>Sala</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex.: 501"
-              placeholderTextColor="#555"
-              value={sala}
-              onChangeText={setSala}
-            />
-            <TouchableOpacity style={styles.submitBtn} onPress={handleEnviar}>
-              <Text style={styles.submitBtnText}>Enviar solicitação</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {lista.map((item, index) => (
-          <View key={index} style={styles.card}>
+    <KeyboardAvoidingView
+      style={estilos.tela}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <Animated.View style={[estilos.tela, { opacity: animacaoOpacidade }]}>
+        <FlatList
+          data={listaFiltrada}
+          keyExtractor={(item) => item.id}
+          renderItem={renderizarItem}
+          contentContainerStyle={estilos.container}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            carregandoSoftwares ? (
+              <ActivityIndicator color={Cores.primario} style={{ marginTop: 40 }} />
+            ) : (
+              <ListaVazia
+                mensagem={
+                  textoBusca
+                    ? `Nenhum resultado para "${textoBusca}".`
+                    : 'Nenhuma solicitação ainda.\nClique em "Nova Solicitação".'
+                }
+              />
+            )
+          }
+          ListHeaderComponent={
             <View>
-              <Text style={styles.cardTitle}>{item.nome}</Text>
-              <Text style={styles.cardSala}>{item.sala}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] || '#555' }]}>
-              <Text style={styles.statusText}>{item.status}</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+              <TouchableOpacity style={estilos.botaoVoltar} onPress={() => roteador.back()}>
+                <Image
+                  source={require('../assets/seta-para-a-esquerda.png')}
+                  style={estilos.iconeVoltar}
+                />
+                <Text style={estilos.textoVoltar}>Voltar</Text>
+              </TouchableOpacity>
 
-      {showSuccess && (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>Solicitação enviada com sucesso!</Text>
-        </View>
-      )}
-    </View>
+              <Text style={estilos.titulo}>Instalação de{'\n'}Software</Text>
+              <Text style={estilos.subtitulo}>
+                Solicite a instalação de softwares para o andamento das aulas
+              </Text>
+
+              <TouchableOpacity
+                style={estilos.botaoNovo}
+                onPress={() => setMostrarFormulario(!mostrarFormulario)}
+              >
+                <Text style={estilos.textoBotaoNovo}>
+                  {mostrarFormulario ? 'Cancelar' : 'Nova Solicitação'}
+                </Text>
+              </TouchableOpacity>
+
+              {mostrarFormulario && (
+                <View style={estilos.cardFormulario}>
+                  <Entrada
+                    rotulo="Nome do Software"
+                    placeholder="Ex.: AutoCAD, MATLAB..."
+                    value={valores.nomeSoftware}
+                    onChangeText={(v) => definirValor('nomeSoftware', v)}
+                    onBlur={() => tocar('nomeSoftware')}
+                    erro={erros.nomeSoftware}
+                    chacoalhar={camposChacoalhando.nomeSoftware}
+                  />
+                  <Entrada
+                    rotulo="Sala"
+                    placeholder="Ex.: Sala 501"
+                    value={valores.sala}
+                    onChangeText={(v) => definirValor('sala', v)}
+                    onBlur={() => tocar('sala')}
+                    erro={erros.sala}
+                    chacoalhar={camposChacoalhando.sala}
+                  />
+                  <Botao titulo="Enviar solicitação" aoPresionar={handleEnviar} estilo={estilos.botaoEnviar} />
+                </View>
+              )}
+
+              <BarraDeBusca
+                valor={textoBusca}
+                aoMudar={setTextoBusca}
+                placeholder="Buscar por nome, sala ou status..."
+              />
+
+              {softwares.length > 0 && (
+                <Text style={estilos.textoContador}>
+                  {listaFiltrada.length} de {softwares.length} solicitação(ões)
+                </Text>
+              )}
+            </View>
+          }
+        />
+      </Animated.View>
+
+      <Notificacao
+        visivel={mostrarSucesso}
+        mensagem="Solicitação enviada com sucesso!"
+        tipo="sucesso"
+      />
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: '#0a0a0a' },
-  scroll: { flex: 1 },
+const estilos = StyleSheet.create({
+  tela: { flex: 1, backgroundColor: Cores.fundo },
   container: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 },
 
-  backBtn: {
-    backgroundColor: '#ED145B',
+  botaoVoltar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
     marginBottom: 28,
+    gap: 8,
   },
-  backText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  iconeVoltar: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
+  textoVoltar: { color: Cores.primario, fontWeight: '700', fontSize: 14 },
 
-  title: { color: '#ED145B', fontSize: 32, fontWeight: '900', lineHeight: 38, marginBottom: 8 },
-  subtitle: { color: '#aaa', fontSize: 13, marginBottom: 24, lineHeight: 18 },
+  titulo: { color: Cores.primario, fontSize: 32, fontWeight: '900', lineHeight: 38, marginBottom: 8 },
+  subtitulo: { color: Cores.textoApagado, fontSize: 13, marginBottom: 24, lineHeight: 18 },
 
-  newBtn: {
-    backgroundColor: '#ED145B',
+  botaoNovo: {
+    backgroundColor: Cores.primario,
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
@@ -131,39 +207,23 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 20,
   },
-  newBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  textoBotaoNovo: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
-  formCard: {
-    backgroundColor: '#141414',
+  cardFormulario: {
+    backgroundColor: Cores.superficie,
     borderBottomRightRadius: 10,
-    borderTopightRadius: 10,
+    borderTopRightRadius: 10,
     padding: 18,
     marginBottom: 24,
     borderLeftWidth: 3,
-    borderLeftColor: '#ED145B',
+    borderLeftColor: Cores.primario,
   },
-  label: { color: '#ccc', fontSize: 13, marginBottom: 6, marginTop: 10 },
-  input: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 6,
-    color: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  submitBtn: {
-    backgroundColor: '#ED145B',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 18,
-  },
-  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  botaoEnviar: { marginTop: 16 },
+
+  textoContador: { color: Cores.textoDesabilitado, fontSize: 12, marginBottom: 8 },
 
   card: {
-    backgroundColor: '#141414',
+    backgroundColor: Cores.superficie,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
@@ -171,28 +231,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 3 },
-  cardSala: { color: '#777', fontSize: 12 },
-  statusBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-
-  toast: {
-    position: 'absolute',
-    bottom: 40,
-    left: 20,
-    right: 20,
-    backgroundColor: '#1a3a2a',
-    borderBottomRightRadius: 10,
-    borderTopRightRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#22c55e',
-    alignItems: 'center',
-  },
-  toastText: { color: '#22c55e', fontWeight: '700', fontSize: 14 },
+  cardTitulo: { color: Cores.textoPrimario, fontWeight: '700', fontSize: 15, marginBottom: 3 },
+  cardSala: { color: Cores.textoApagado, fontSize: 12 },
+  badgeStatus: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4 },
+  textoStatus: { color: '#fff', fontSize: 11, fontWeight: '700' },
 });
