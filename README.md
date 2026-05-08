@@ -153,7 +153,7 @@ Implementada diretamente no `_layout.js` via `useSegments()` + `useEffect()`. N�
 
 ---
 
-## f) Diferencial Implementado — Busca e Filtragem em Tempo Real
+## Diferencial Implementado — Busca e Filtragem em Tempo Real
 
 **Diferencial escolhido:** Busca e filtragem em tempo real com FlatList
 
