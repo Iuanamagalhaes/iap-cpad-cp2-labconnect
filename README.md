@@ -107,7 +107,7 @@ labconnect/
 │   ├── Entrada.jsx         # Input com label, erro inline e shake
 │   ├── Notificacao.jsx     # Feedback animado de sucesso/erro
 │   ├── BarraDePesquisa.jsx # Campo de busca em tempo real
-│   ├── BarraDeBusca.jsx # Campo de busca em tempo real
+│   ├── BarraDeBusca.jsx    # Campo de pesquisa simples com atualização dinâmica de texto
 │   └── ListaVazia.jsx      # Tela de lista vazia
 ├── context/
 │   ├── ContextoAuth.jsx    # Estado global de autenticação
